@@ -1,0 +1,22 @@
+apply plugin: "java"
+
+description = "Test manually committing offsets in Kafka"
+
+test {
+    useJUnit()
+}
+
+apply plugin: 'maven'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "com.google.guava:guava:18.0"
+    compile 'org.apache.kafka:kafka_2.10:0.8.2.1'
+    compile "org.apache.curator:curator-recipes:2.8.0"
+
+    testCompile "com.netflix.curator:curator-test:1.2.5"
+    testCompile "junit:junit:4.12"
+}

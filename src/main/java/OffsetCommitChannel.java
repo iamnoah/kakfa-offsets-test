@@ -8,6 +8,7 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
 import com.google.common.cache.RemovalNotification;
 import com.google.common.collect.Maps;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import kafka.api.ConsumerMetadataRequest;
 import kafka.cluster.Broker;
 import kafka.common.ErrorMapping;
@@ -47,11 +48,16 @@ class OffsetCommitChannel {
 					return connectToOffsetManager(key);
 				}
 			});
+	private final int port;
+
+	OffsetCommitChannel(int port) {
+		this.port = port;
+	}
 
 	private BlockingChannel connectToOffsetManager(String consumerGroupId) throws IOException {
 		BlockingChannel channel = new BlockingChannel(
 				"localhost",
-				2128,
+				port,
 				BlockingChannel.UseDefaultBufferSize(),
 				BlockingChannel.UseDefaultBufferSize(),
 				5000
@@ -68,7 +74,7 @@ class OffsetCommitChannel {
 
 		if (metadataResponse.errorCode() == ErrorMapping.NoError()) {
 			final Broker offsetManager = metadataResponse.coordinator();
-			if (!offsetManager.host().equals("localhost") || offsetManager.port() != 2128) {
+			if (!offsetManager.host().equals("localhost") || offsetManager.port() != port) {
 				channel.disconnect();
 				channel = new BlockingChannel(
 						offsetManager.host(),
@@ -110,7 +116,13 @@ class OffsetCommitChannel {
 		int tries = 0;
 		while(tries++ < 5) {
 			try {
-				final BlockingChannel channel = channelCache.getUnchecked(consumerGroup);
+				final BlockingChannel channel;
+				try {
+					channel = channelCache.getUnchecked(consumerGroup);
+				} catch (UncheckedExecutionException e)  {
+					throw e.getCause();
+				}
+				LOG.info("Trying to commit #" + tries);
 				final OffsetCommitResponse offsetCommitResponse;
 
 				// we can only make 1 request+response at a time over the channel
@@ -134,10 +146,12 @@ class OffsetCommitChannel {
 					}
 				}
 				// else just retry
-			} catch (IOException e) {
+			} catch (Exception e) {
 				LOG.error("Error committing offsets. Reconnecting.", e);
 				// if there is a problem with the channel, reconnect
 				channelCache.invalidate(consumerGroup);
+			} catch (Throwable t) {
+				LOG.error("WTF");
 			}
 
 			// wait before the next try

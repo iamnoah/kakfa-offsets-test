@@ -2,6 +2,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -100,7 +101,7 @@ public class ManualOffsetCommitTest {
 		final List<KafkaStream<byte[], byte[]>> streams = connector.createMessageStreams(ImmutableMap.of(TOPIC, PARTITIONS)).get(TOPIC);
 		for (final KafkaStream<byte[], byte[]> stream : streams) {
 			final ConsumerIterator<byte[], byte[]> iterator = stream.iterator();
-			final OffsetCommitChannel offsetCommitChannel = new OffsetCommitChannel();
+			final OffsetCommitChannel offsetCommitChannel = new OffsetCommitChannel(kafkaServer.config().advertisedPort());
 			threadPool.submit(new Runnable() {
 				@Override
 				public void run() {
